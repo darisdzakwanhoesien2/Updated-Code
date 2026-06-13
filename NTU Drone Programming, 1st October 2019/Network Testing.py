@@ -16,7 +16,8 @@ df = pd.DataFrame({ 'from':['A', 'B', 'C','A','E','F','E','G','G','D','F'], 'to'
 df
  
 # Build your graph
-G=nx.from_pandas_dataframe(df, 'from', 'to')
+# `from_pandas_dataframe` is deprecated in modern networkx; `from_pandas_edgelist` is the replacement.
+G = nx.from_pandas_edgelist(df, source='from', target='to')
  
 # Fruchterman Reingold
 nx.draw(G, with_labels=True, node_size=1500, node_color="skyblue", pos=nx.fruchterman_reingold_layout(G))

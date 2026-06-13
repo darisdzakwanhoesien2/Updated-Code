@@ -24,6 +24,9 @@ sock1 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock3 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# Avoid hanging forever on recv if drones are off / unreachable.
+for sock in (sock1, sock2, sock3, sock4):
+  sock.settimeout(1.0)
 # Bind to the local address and port
 sock1.bind(local1_address)
 sock2.bind(local2_address)
@@ -44,12 +47,13 @@ def send(message, delay):
     print("Error sending: " + str(e))
 
   # Delay for a user-defined period of time
+  # Tello expects a small gap between commands; without this you can drop/ignore commands.
   time.sleep(delay)
 
 # Receive the message from Tello
-def receive():
+def receive(stop_event):
   # Continuously loop and listen for incoming messages
-  while True:
+  while not stop_event.is_set():
     # Try to receive the message otherwise print the exception
     try:
       response1, ip_address = sock1.recvfrom(128)
@@ -61,6 +65,8 @@ def receive():
       print("Received message: from Tello EDU #2: " + response2.decode(encoding='utf-8'))
       print("Received message: from Tello EDU #3: " + response3.decode(encoding='utf-8'))
       print("Received message: from Tello EDU #4: " + response4.decode(encoding='utf-8'))   
+    except socket.timeout:
+      continue
     except Exception as e:
       # If there's an error close the socket and break out of the loop
       sock1.close()
@@ -72,7 +78,8 @@ def receive():
 
 # Create and start a listening thread that runs in the background
 # This utilizes our receive functions and will continuously monitor for incoming messages
-receiveThread = threading.Thread(target=receive)
+stop_event = threading.Event()
+receiveThread = threading.Thread(target=receive, args=(stop_event,))
 receiveThread.daemon = True
 receiveThread.start()
 
@@ -102,11 +109,10 @@ send("up 400", 3)
 
 
 # Loop and create each leg of the box
-#for i in range(4):
-  # Fly forward
- ## send("forward " + str(box_leg_distance), 4)
-  # Yaw right
-  #send("cw " + str(yaw_angle), 3)
+# (Uncomment to fly the box pattern after takeoff.)
+# for _ in range(4):
+#   send("forward " + str(box_leg_distance), 4)
+#   send("cw " + str(yaw_angle), 3)
 
 # Land
 send("land", 5)
@@ -114,7 +120,7 @@ send("land", 5)
 
 
 
-###THIS IS PAS THE AREA YOU CAN EDIT###
+###THIS IS PAST THE AREA YOU CAN EDIT###
 
 
 
@@ -124,8 +130,8 @@ send("land", 5)
 print("Mission completed successfully!")
 
 # Close the socket
+stop_event.set()
 sock1.close()
 sock2.close()
 sock3.close()
 sock4.close()
-
